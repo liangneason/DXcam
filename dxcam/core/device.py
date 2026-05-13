@@ -34,6 +34,9 @@ class Device:
     desc: DXGI_ADAPTER_DESC1 | None = None
 
     def __post_init__(self) -> None:
+        self._initialize_from_adapter()
+
+    def _initialize_from_adapter(self) -> None:
         self.desc = DXGI_ADAPTER_DESC1()
         self.adapter.GetDesc1(ctypes.byref(self.desc))
 
@@ -63,6 +66,23 @@ class Device:
         )
         device = cast(Any, self.device)
         device.GetImmediateContext(ctypes.byref(self.im_context))
+
+    def rebind_to_adapter(self, adapter: Any) -> None:
+        """Rebind this device wrapper to a different DXGI adapter.
+
+        Used during display recovery when the active desktop output moves to
+        a different adapter (e.g., RDP indirect display -> physical GPU).
+        Releases the old D3D11 device/context implicitly via refcount once
+        all callers drop their references.
+        """
+        self.adapter = adapter
+        self._initialize_from_adapter()
+
+    @property
+    def adapter_luid(self) -> tuple[int, int]:
+        assert self.desc is not None
+        return (self.desc.AdapterLuid.LowPart, self.desc.AdapterLuid.HighPart)
+
 
     def enum_outputs(self) -> list[Any]:
         i = 0
